@@ -1,117 +1,78 @@
 import os
-from pathlib import Path
 
-from dotenv import load_dotenv
+import streamlit as st
 from google import genai
 
-
-# --------------------------------------------------
-# LOAD ENVIRONMENT
-# --------------------------------------------------
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-ENV_FILE = BASE_DIR / ".env"
-
-load_dotenv(ENV_FILE)
-
-
-# --------------------------------------------------
-# BANKING L1 AGENT
-# --------------------------------------------------
 
 class BankingL1Agent:
 
     def __init__(self):
 
-        api_key = os.getenv("GEMINI_API_KEY")
+        # ==========================================
+        # GET GEMINI API KEY
+        # ==========================================
+
+        api_key = None
+
+        # Streamlit Cloud
+        try:
+            api_key = st.secrets.get("GEMINI_API_KEY")
+        except Exception:
+            pass
+
+        # Local .env / environment variable
+        if not api_key:
+            api_key = os.getenv("GEMINI_API_KEY")
+
+        # ==========================================
+        # VALIDATE
+        # ==========================================
 
         if not api_key:
 
             raise ValueError(
-                f"GEMINI_API_KEY not found.\n"
-                f"Expected .env file at: {ENV_FILE}"
+                "GEMINI_API_KEY not found. "
+                "Please add GEMINI_API_KEY to "
+                "Streamlit Cloud Secrets."
             )
+
+        # ==========================================
+        # GEMINI CLIENT
+        # ==========================================
 
         self.client = genai.Client(
             api_key=api_key
         )
 
-        # Use the Gemini model available to your API account.
         self.model = "gemini-3.1-flash-lite"
 
 
-    # --------------------------------------------------
-    # SYSTEM INSTRUCTIONS
-    # --------------------------------------------------
+    # ==============================================
+    # SYSTEM INSTRUCTION
+    # ==============================================
 
     def get_system_instruction(self):
 
         return """
 You are a Banking L1 Support Agent.
 
-You assist customers and L1 support agents with
-banking-related problems.
+You assist L1 support teams with banking-related
+customer issues.
 
-==================================================
-STRICT SOP RULES
-==================================================
+IMPORTANT RULES:
 
-1. You MUST use the provided approved SOP as the
-   primary and authoritative source.
+1. Use the approved SOP provided to you.
+2. Do not invent troubleshooting steps.
+3. Do not provide procedures that are not in the SOP.
+4. Follow the SOP troubleshooting sequence.
+5. If the SOP does not cover the issue, recommend
+   L2 escalation.
+6. Never request OTP, PIN, UPI PIN, CVV, password,
+   or full card number.
+7. Never repeat sensitive information provided by
+   the user.
 
-2. Do NOT invent troubleshooting steps.
-
-3. Do NOT provide banking procedures that are not
-   contained in the approved SOP.
-
-4. Follow the SOP's troubleshooting sequence.
-
-5. If the user asks a question unrelated to the
-   provided SOP, explain that the current SOP does
-   not cover the request.
-
-6. If there is insufficient information in the SOP,
-   recommend L2 escalation.
-
-==================================================
-SECURITY RULES
-==================================================
-
-NEVER request or ask the customer to provide:
-
-- OTP
-- Password
-- PIN
-- UPI PIN
-- CVV
-- Full card number
-- Banking credentials
-
-If the customer voluntarily provides sensitive
-information, do not repeat it back.
-
-Tell the customer not to share sensitive
-authentication information.
-
-==================================================
-ESCALATION
-==================================================
-
-If the SOP says the issue requires escalation,
-clearly tell the user:
-
-"This issue requires escalation to L2 support."
-
-Do not attempt to bypass an escalation requirement.
-
-==================================================
-RESPONSE STYLE
-==================================================
-
-Be concise, professional and helpful.
-
-For troubleshooting requests, use:
+For troubleshooting responses use:
 
 Issue Identified:
 ...
@@ -123,7 +84,7 @@ Steps to Resolve:
 3. ...
 
 Escalation:
-Yes/No
+Yes / No
 
 Reason:
 ...
@@ -131,14 +92,13 @@ Reason:
 Security Reminder:
 ...
 
-For normal conversational questions, respond
-naturally while staying within the SOP context.
+Be concise and professional.
 """
 
 
-    # --------------------------------------------------
-    # BUILD SOP CONTEXT
-    # --------------------------------------------------
+    # ==============================================
+    # SOP CONTEXT
+    # ==============================================
 
     def build_sop_context(self, sop_document):
 
@@ -172,14 +132,14 @@ SOP CONTENT
 {sop_document["content"]}
 
 ==================================================
-END OF APPROVED SOP
+END SOP
 ==================================================
 """
 
 
-    # --------------------------------------------------
+    # ==============================================
     # CHAT
-    # --------------------------------------------------
+    # ==============================================
 
     def chat(
         self,
@@ -196,11 +156,6 @@ END OF APPROVED SOP
             + "\n\n"
             + sop_context
         )
-
-
-        # ----------------------------------------------
-        # Build conversation
-        # ----------------------------------------------
 
         conversation = []
 
@@ -222,48 +177,35 @@ END OF APPROVED SOP
                     f"ASSISTANT:\n{content}"
                 )
 
-
         conversation_text = "\n\n".join(
             conversation
         )
-
-
-        # ----------------------------------------------
-        # Final prompt
-        # ----------------------------------------------
 
         prompt = f"""
 {system_instruction}
 
 ==================================================
-CONVERSATION HISTORY
+CONVERSATION
 ==================================================
 
 {conversation_text}
 
 ==================================================
-INSTRUCTION
+TASK
 ==================================================
 
-Respond to the user's latest message.
+Respond to the latest user message.
 
-Remember:
+Use ONLY the approved SOP.
 
-- Use only the approved SOP.
-- Do not invent procedures.
-- Protect sensitive information.
-- Follow escalation rules.
+Do not invent procedures.
+Do not ask for sensitive banking credentials.
+Follow the SOP escalation process.
 """
-
-
-        # ----------------------------------------------
-        # Gemini
-        # ----------------------------------------------
 
         response = self.client.models.generate_content(
             model=self.model,
             contents=prompt
         )
-
 
         return response.text
