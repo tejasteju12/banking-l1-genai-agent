@@ -4,40 +4,40 @@ from utils.sop_retriever import SOPRetriever
 from utils.genai_agent import BankingL1Agent
 
 
-# ==================================================
-# PAGE CONFIG
-# ==================================================
+# ============================================================
+# PAGE CONFIGURATION
+# ============================================================
 
 st.set_page_config(
-    page_title="Banking L1 GenAI Agent",
+    page_title="Banking L1 GenAI Support",
     page_icon="🏦",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 
-# ==================================================
-# RESPONSIVE CSS
-# ==================================================
+# ============================================================
+# RESPONSIVE / MOBILE CSS
+# ============================================================
 
 st.markdown(
     """
     <style>
 
-    /* ------------------------------------------
+    /* ================================================
        GENERAL
-    ------------------------------------------ */
+    ================================================ */
 
     .block-container {
-        padding-top: 1rem;
-        padding-bottom: 2rem;
         max-width: 1200px;
+        padding-top: 1rem;
+        padding-bottom: 3rem;
     }
 
 
-    /* ------------------------------------------
+    /* ================================================
        BUTTONS
-    ------------------------------------------ */
+    ================================================ */
 
     .stButton > button {
         width: 100%;
@@ -47,18 +47,18 @@ st.markdown(
     }
 
 
-    /* ------------------------------------------
+    /* ================================================
        INPUT
-    ------------------------------------------ */
+    ================================================ */
 
     .stChatInput textarea {
         font-size: 16px !important;
     }
 
 
-    /* ------------------------------------------
+    /* ================================================
        MOBILE
-    ------------------------------------------ */
+    ================================================ */
 
     @media only screen and (max-width: 768px) {
 
@@ -68,60 +68,42 @@ st.markdown(
             padding-top: 0.5rem;
         }
 
-
         h1 {
             font-size: 1.6rem !important;
         }
-
 
         h2 {
             font-size: 1.3rem !important;
         }
 
-
         h3 {
             font-size: 1.1rem !important;
         }
 
-
         p {
             font-size: 15px;
         }
-
 
         .stButton > button {
             min-height: 48px;
             font-size: 16px;
         }
 
-
-        /* Chat messages */
-
         [data-testid="stChatMessage"] {
-            padding: 0.5rem 0.2rem;
+            padding: 0.5rem 0.1rem;
         }
-
-
-        /* Expanders */
 
         [data-testid="stExpander"] {
             border-radius: 10px;
         }
 
-
-        /* Select boxes */
-
         [data-testid="stSelectbox"] {
             margin-bottom: 0.5rem;
         }
 
-
-        /* Chat input */
-
         [data-testid="stChatInput"] {
             padding-bottom: 0.5rem;
         }
-
     }
 
     </style>
@@ -130,9 +112,9 @@ st.markdown(
 )
 
 
-# ==================================================
+# ============================================================
 # LOAD SERVICES
-# ==================================================
+# ============================================================
 
 @st.cache_resource
 def load_retriever():
@@ -146,13 +128,26 @@ def load_agent():
     return BankingL1Agent()
 
 
-retriever = load_retriever()
-agent = load_agent()
+try:
+
+    retriever = load_retriever()
+
+    agent = load_agent()
+
+except Exception as e:
+
+    st.error(
+        "Unable to initialize the Banking L1 Agent."
+    )
+
+    st.exception(e)
+
+    st.stop()
 
 
-# ==================================================
+# ============================================================
 # SESSION STATE
-# ==================================================
+# ============================================================
 
 if "messages" not in st.session_state:
 
@@ -169,20 +164,20 @@ if "search_results" not in st.session_state:
     st.session_state.search_results = []
 
 
-# ==================================================
+# ============================================================
 # HEADER
-# ==================================================
+# ============================================================
 
 st.title("🏦 Banking L1 Support")
 
 st.caption(
-    "SOP-grounded GenAI support assistant"
+    "SOP-grounded GenAI assistant for Banking L1 support"
 )
 
 
-# ==================================================
-# MOBILE / DESKTOP ISSUE SELECTOR
-# ==================================================
+# ============================================================
+# ISSUE SELECTION
+# ============================================================
 
 with st.expander(
     "📂 Select Banking Issue",
@@ -193,66 +188,74 @@ with st.expander(
 
     categories = retriever.get_categories()
 
+    if not categories:
 
-    category = st.selectbox(
-        "Category",
-        ["Select"] + categories
-    )
-
-
-    issue = "Select"
-
-
-    if category != "Select":
-
-        issues = retriever.get_issues(
-            category
+        st.warning(
+            "No SOP categories were found."
         )
 
-        issue = st.selectbox(
-            "Issue",
-            ["Select"] + issues
+    else:
+
+        category = st.selectbox(
+            "Category",
+            ["Select"] + categories
         )
 
+        issue = "Select"
 
-    if (
-        category != "Select"
-        and issue != "Select"
-    ):
+        if category != "Select":
 
-        if st.button(
-            "🔎 Load SOP",
-            use_container_width=True
-        ):
+            issues = retriever.get_issues(
+                category
+            )
 
-            results = retriever.get_by_issue(
-                category,
-                issue
+            issue = st.selectbox(
+                "Issue",
+                ["Select"] + issues
             )
 
 
-            if results:
+        # ----------------------------------------------------
+        # LOAD SOP
+        # ----------------------------------------------------
 
-                st.session_state.selected_sop = (
-                    results[0]
+        if (
+            category != "Select"
+            and issue != "Select"
+        ):
+
+            if st.button(
+                "🔎 Load SOP",
+                use_container_width=True
+            ):
+
+                results = retriever.get_by_issue(
+                    category,
+                    issue
                 )
 
-                st.session_state.messages = []
+                if results:
 
-                st.session_state.search_results = []
+                    st.session_state.selected_sop = (
+                        results[0]
+                    )
 
-                st.rerun()
+                    st.session_state.messages = []
 
-            else:
+                    st.session_state.search_results = []
 
-                st.error(
-                    "No approved SOP found."
-                )
+                    st.rerun()
+
+                else:
+
+                    st.error(
+                        "No approved SOP found."
+                    )
 
 
-# ==================================================
+# ============================================================
 # ACTIVE SOP
-# ==================================================
+# ============================================================
 
 if st.session_state.selected_sop:
 
@@ -260,39 +263,52 @@ if st.session_state.selected_sop:
 
 
     st.success(
-        f"📄 {sop['document_id']} — "
+        f"📄 Active SOP: "
+        f"{sop['document_id']} — "
         f"{sop['title']}"
     )
 
 
-    # ----------------------------------------------
+    # --------------------------------------------------------
     # VIEW SOP
-    # ----------------------------------------------
+    # --------------------------------------------------------
 
     with st.expander(
         "📖 View SOP Document"
     ):
 
-        st.markdown(
-            f"**SOP ID:** {sop['document_id']}"
-        )
+        col1, col2 = st.columns(2)
 
-        st.markdown(
-            f"**Category:** {sop['category']}"
-        )
+        with col1:
 
-        st.markdown(
-            f"**Issue:** {sop['issue']}"
-        )
+            st.markdown(
+                f"**SOP ID**  \n"
+                f"{sop['document_id']}"
+            )
 
-        st.markdown(
-            f"**Support Level:** "
-            f"{sop['support_level']}"
-        )
+            st.markdown(
+                f"**Category**  \n"
+                f"{sop['category']}"
+            )
 
-        st.markdown(
-            f"**Version:** {sop['version']}"
-        )
+            st.markdown(
+                f"**Issue**  \n"
+                f"{sop['issue']}"
+            )
+
+
+        with col2:
+
+            st.markdown(
+                f"**Support Level**  \n"
+                f"{sop['support_level']}"
+            )
+
+            st.markdown(
+                f"**Version**  \n"
+                f"{sop['version']}"
+            )
+
 
         st.divider()
 
@@ -301,22 +317,31 @@ if st.session_state.selected_sop:
         )
 
 
-# ==================================================
+else:
+
+    st.info(
+        "👋 Select a banking issue above or describe "
+        "your issue below. The system will try to "
+        "find the appropriate SOP automatically."
+    )
+
+
+# ============================================================
 # CHAT HEADER
-# ==================================================
+# ============================================================
 
 st.subheader("💬 L1 Support Chat")
 
 
-# ==================================================
+# ============================================================
 # CHAT HISTORY
-# ==================================================
+# ============================================================
 
 if not st.session_state.messages:
 
-    st.info(
-        "👋 Select a banking issue and start "
-        "your conversation."
+    st.caption(
+        "Start the conversation by describing the "
+        "customer's banking issue."
     )
 
 
@@ -331,27 +356,31 @@ for message in st.session_state.messages:
         )
 
 
-# ==================================================
+# ============================================================
 # CHAT INPUT
-# ==================================================
+# ============================================================
 
 user_input = st.chat_input(
-    "Describe the customer's issue..."
+    "Describe the customer's banking issue..."
 )
 
 
 if user_input:
 
-    # ----------------------------------------------
+    # ========================================================
     # AUTOMATIC SOP RETRIEVAL
-    # ----------------------------------------------
+    # ========================================================
 
     if not st.session_state.selected_sop:
 
-        results = retriever.search(
-            user_input,
-            top_k=1
-        )
+        with st.spinner(
+            "🔎 Finding the appropriate SOP..."
+        ):
+
+            results = retriever.search(
+                user_input,
+                top_k=1
+            )
 
 
         if results:
@@ -363,17 +392,17 @@ if user_input:
         else:
 
             st.error(
-                "No approved SOP was found for this "
-                "issue. Please select an issue or "
-                "escalate to L2."
+                "No approved SOP was found for this issue. "
+                "Please select an issue from the menu or "
+                "escalate to L2 support."
             )
 
             st.stop()
 
 
-    # ----------------------------------------------
+    # ========================================================
     # USER MESSAGE
-    # ----------------------------------------------
+    # ========================================================
 
     st.session_state.messages.append(
         {
@@ -388,14 +417,14 @@ if user_input:
         st.markdown(user_input)
 
 
-    # ----------------------------------------------
+    # ========================================================
     # AI RESPONSE
-    # ----------------------------------------------
+    # ========================================================
 
     with st.chat_message("assistant"):
 
         with st.spinner(
-            "🔎 Checking SOP..."
+            "🤖 Checking SOP..."
         ):
 
             try:
@@ -415,19 +444,21 @@ if user_input:
             except Exception as e:
 
                 response = (
-                    "I encountered an error while "
-                    "processing your request."
+                    "I am unable to process the request "
+                    "right now. Please escalate this issue "
+                    "to L2 support."
                 )
-
 
                 st.error(
-                    str(e)
+                    "AI processing error"
                 )
 
+                st.exception(e)
 
-    # ----------------------------------------------
-    # SAVE RESPONSE
-    # ----------------------------------------------
+
+    # ========================================================
+    # SAVE AI RESPONSE
+    # ========================================================
 
     st.session_state.messages.append(
         {
@@ -437,16 +468,20 @@ if user_input:
     )
 
 
-# ==================================================
-# MOBILE SEARCH
-# ==================================================
+# ============================================================
+# SEARCH OTHER SOP
+# ============================================================
 
 with st.expander(
     "🔎 Search Other SOP"
 ):
 
     search_query = st.text_input(
-        "Describe the issue"
+        "Describe the banking issue",
+        placeholder=(
+            "Example: customer was debited but ATM "
+            "did not dispense cash"
+        )
     )
 
 
@@ -465,6 +500,10 @@ with st.expander(
             )
 
 
+    # --------------------------------------------------------
+    # SEARCH RESULTS
+    # --------------------------------------------------------
+
     if st.session_state.search_results:
 
         st.markdown(
@@ -477,10 +516,15 @@ with st.expander(
             if st.button(
                 f"{result['document_id']} — "
                 f"{result['title']}",
-                key=f"mobile_{result['document_id']}"
+                key=(
+                    f"search_"
+                    f"{result['document_id']}"
+                )
             ):
 
-                st.session_state.selected_sop = result
+                st.session_state.selected_sop = (
+                    result
+                )
 
                 st.session_state.messages = []
 
@@ -489,9 +533,9 @@ with st.expander(
                 st.rerun()
 
 
-# ==================================================
-# CONTROLS
-# ==================================================
+# ============================================================
+# CHAT CONTROLS
+# ============================================================
 
 with st.expander(
     "⚙️ Chat Controls"
@@ -521,18 +565,19 @@ with st.expander(
         st.rerun()
 
 
-# ==================================================
-# SECURITY
-# ==================================================
+# ============================================================
+# SECURITY WARNING
+# ============================================================
 
 st.divider()
 
 st.warning(
-    "🔐 Never share OTP, PIN, UPI PIN, password, "
-    "CVV, or full card details."
+    "🔐 Security: Never share OTP, PIN, UPI PIN, "
+    "password, CVV, or full card details."
 )
 
 
 st.caption(
-    "Banking L1 GenAI Agent • SOP-grounded responses"
+    "Banking L1 GenAI Prototype • "
+    "Responses are grounded in approved SOP documents."
 )

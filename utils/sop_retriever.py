@@ -1,166 +1,333 @@
 from pathlib import Path
-import re
 
 
 class SOPRetriever:
+
     def __init__(self, sop_directory="sops"):
-        self.sop_directory = Path(sop_directory)
+
+        self.sop_directory = Path(
+            sop_directory
+        )
+
         self.documents = []
 
         self.load_documents()
 
+
+    # ========================================================
+    # LOAD SOP DOCUMENTS
+    # ========================================================
+
     def load_documents(self):
-        """Load all SOP markdown files."""
 
         self.documents = []
 
-        for file_path in self.sop_directory.glob("*.md"):
-            content = file_path.read_text(encoding="utf-8")
 
-            document = self.parse_document(
-                file_path.name,
-                content
-            )
+        if not self.sop_directory.exists():
 
-            self.documents.append(document)
+            return
 
-    def parse_document(self, filename, content):
-        """Extract basic metadata from SOP."""
 
-        document_id = self.extract_field(
-            content,
-            "SOP"
-        )
+        for file_path in sorted(
+            self.sop_directory.glob("*.md")
+        ):
 
-        title = self.extract_field(
-            content,
-            "Title"
-        )
+            try:
 
-        category = self.extract_field(
-            content,
-            "Category"
-        )
+                content = file_path.read_text(
+                    encoding="utf-8"
+                )
 
-        issue = self.extract_field(
-            content,
-            "Issue"
-        )
+                document = self.parse_document(
+                    file_path,
+                    content
+                )
 
-        support_level = self.extract_field(
-            content,
-            "Support Level"
-        )
+                self.documents.append(
+                    document
+                )
 
-        version = self.extract_field(
-            content,
-            "Version"
-        )
+            except Exception as e:
+
+                print(
+                    f"Unable to load {file_path}: {e}"
+                )
+
+
+    # ========================================================
+    # PARSE SOP
+    # ========================================================
+
+    def parse_document(
+        self,
+        file_path,
+        content
+    ):
+
+        lines = content.splitlines()
+
+
+        document_id = file_path.stem
+
+        title = file_path.stem
+
+        category = "General"
+
+        issue = "General Banking Issue"
+
+        support_level = "L1"
+
+        version = "1.0"
+
+
+        # ----------------------------------------------------
+        # Parse metadata
+        # ----------------------------------------------------
+
+        for line in lines:
+
+            clean = line.strip()
+
+
+            if clean.startswith(
+                "Document ID:"
+            ):
+
+                document_id = (
+                    clean.split(
+                        ":", 1
+                    )[1].strip()
+                )
+
+
+            elif clean.startswith(
+                "Title:"
+            ):
+
+                title = (
+                    clean.split(
+                        ":", 1
+                    )[1].strip()
+                )
+
+
+            elif clean.startswith(
+                "Category:"
+            ):
+
+                category = (
+                    clean.split(
+                        ":", 1
+                    )[1].strip()
+                )
+
+
+            elif clean.startswith(
+                "Issue:"
+            ):
+
+                issue = (
+                    clean.split(
+                        ":", 1
+                    )[1].strip()
+                )
+
+
+            elif clean.startswith(
+                "Support Level:"
+            ):
+
+                support_level = (
+                    clean.split(
+                        ":", 1
+                    )[1].strip()
+                )
+
+
+            elif clean.startswith(
+                "Version:"
+            ):
+
+                version = (
+                    clean.split(
+                        ":", 1
+                    )[1].strip()
+                )
+
 
         return {
-            "filename": filename,
+
             "document_id": document_id,
+
             "title": title,
+
             "category": category,
+
             "issue": issue,
+
             "support_level": support_level,
+
             "version": version,
-            "content": content
+
+            "content": content,
+
+            "file": str(file_path)
+
         }
 
-    def extract_field(self, content, field):
-        pattern = rf"^{field}:\s*(.+)$"
 
-        match = re.search(
-            pattern,
-            content,
-            re.MULTILINE | re.IGNORECASE
-        )
-
-        if match:
-            return match.group(1).strip()
-
-        # SOP ID is in the markdown heading
-        if field == "SOP":
-            match = re.search(
-                r"^#\s*(SOP-\d+)",
-                content,
-                re.MULTILINE
-            )
-
-            if match:
-                return match.group(1)
-
-        return ""
+    # ========================================================
+    # CATEGORIES
+    # ========================================================
 
     def get_categories(self):
-        return sorted(
-            list(
-                set(
-                    doc["category"]
-                    for doc in self.documents
-                )
+
+        categories = set()
+
+
+        for document in self.documents:
+
+            categories.add(
+                document["category"]
             )
+
+
+        return sorted(
+            categories
         )
 
-    def get_issues(self, category):
-        return sorted(
-            list(
-                set(
-                    doc["issue"]
-                    for doc in self.documents
-                    if doc["category"] == category
+
+    # ========================================================
+    # ISSUES
+    # ========================================================
+
+    def get_issues(
+        self,
+        category
+    ):
+
+        issues = []
+
+
+        for document in self.documents:
+
+            if (
+                document["category"]
+                .lower()
+                ==
+                category.lower()
+            ):
+
+                issues.append(
+                    document["issue"]
                 )
-            )
+
+
+        return sorted(
+            set(issues)
         )
 
-    def get_by_issue(self, category, issue):
-        """Exact retrieval using category + issue."""
 
-        results = [
-            doc
-            for doc in self.documents
-            if doc["category"] == category
-            and doc["issue"] == issue
-        ]
+    # ========================================================
+    # FIND BY ISSUE
+    # ========================================================
+
+    def get_by_issue(
+        self,
+        category,
+        issue
+    ):
+
+        results = []
+
+
+        for document in self.documents:
+
+            if (
+                document["category"]
+                .lower()
+                ==
+                category.lower()
+                and
+                document["issue"]
+                .lower()
+                ==
+                issue.lower()
+            ):
+
+                results.append(
+                    document
+                )
+
 
         return results
 
-    def search(self, query, top_k=3):
-        """Simple keyword-based retrieval."""
+
+    # ========================================================
+    # SIMPLE SEARCH
+    # ========================================================
+
+    def search(
+        self,
+        query,
+        top_k=3
+    ):
 
         query_words = set(
-            query.lower().split()
+            query.lower()
+            .split()
         )
+
 
         scored_documents = []
 
-        for doc in self.documents:
 
-            searchable_text = " ".join([
-                doc["title"],
-                doc["category"],
-                doc["issue"],
-                doc["content"]
-            ]).lower()
+        for document in self.documents:
+
+            text = (
+                document["title"]
+                + " "
+                + document["category"]
+                + " "
+                + document["issue"]
+                + " "
+                + document["content"]
+            ).lower()
+
 
             score = 0
 
+
             for word in query_words:
-                if len(word) > 2 and word in searchable_text:
+
+                if len(word) < 3:
+
+                    continue
+
+
+                if word in text:
+
                     score += 1
 
+
             if score > 0:
+
                 scored_documents.append(
-                    (score, doc)
+                    (
+                        score,
+                        document
+                    )
                 )
+
 
         scored_documents.sort(
             key=lambda x: x[0],
             reverse=True
         )
 
+
         return [
-            doc
-            for score, doc in scored_documents[:top_k]
+            document
+            for score, document
+            in scored_documents[:top_k]
         ]
